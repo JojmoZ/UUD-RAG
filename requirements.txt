@@ -1,11 +1,19 @@
 # === LangChain Core Components ===
 langchain-core
+langchain
+
+llama-index 
+langchain_experimental
 # === LangChain Integrations ===
 langchain-google-genai
 langchain-community
 langchain-qdrant
+langchainhub
+langchain-google-genai
+langchain-groq 
 # === Data Loading and Processing ===
 pypdf
+pymupdf
 unstructured
 # === Vector Database ===
 qdrant-client
