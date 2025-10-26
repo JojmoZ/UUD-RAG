@@ -11,19 +11,14 @@ from typing import TypeVar, Type, Optional
 import json
 import os
 import hashlib
+from llm.base import BaseLLM
 
 T = TypeVar("T", bound=BaseModel)
 
 class AgenticChunker:
-    def __init__(self, google_api_key: str, groq_api_key: str, cache_dir: str = "./chunk_cache"):
-        if google_api_key is None:
-            raise ValueError("OpenAI API key must be provided.")
+    def __init__(self, llm: BaseLLM, cache_dir: str = "./chunk_cache"):
         
-        self.llm = ChatGroq(
-            model='llama-3.1-8b-instant',
-            groq_api_key=groq_api_key,
-            temperature=0,
-        )
+        self.llm = llm
         
         self.chunks = {}
         self.cache_dir = cache_dir
@@ -36,6 +31,7 @@ class AgenticChunker:
     def _get_cache_path(self, doc_hash: str) -> str:
         """Get the cache file path for a document hash"""
         return os.path.join(self.cache_dir, f"{doc_hash}.json")
+    
     
     def save_chunks(self, filepath: str = None):
         """Save all chunks to a JSON file"""
@@ -198,8 +194,7 @@ class AgenticChunker:
                 ("user", "Uraikan konten hukum berikut:: {input}"),
             ]
         )
-        runnable = PROMPT | self.llm
-        result = runnable.invoke({"input": text}).content
+        result = self.llm.answer(PROMPT, {"input": text})
         
         class Sentences (BaseModel):
             propositions: list[str]
@@ -248,12 +243,10 @@ class AgenticChunker:
             ]
         )
 
-        runnable = PROMPT | self.llm
-
-        new_chunk_summary = runnable.invoke({
+        new_chunk_summary = self.llm.answer(PROMPT, {
             "proposition": "\n".join(chunk['propositions']),
             "current_summary" : chunk['summary']
-        }).content
+        })
 
         return new_chunk_summary
     
@@ -288,16 +281,14 @@ class AgenticChunker:
                 ("user", "Proposisi dalam Chunk:\n{proposition}\n\nRingkasan chunk:\n{current_summary}\n\nJudul chunk saat ini:\n{current_title}"),
             ]
         )
-
-        runnable = PROMPT | self.llm
-
-        updated_chunk_title = runnable.invoke({
+        
+        new_chunk_title = self.llm.answer(PROMPT, {
             "proposition": "\n".join(chunk['propositions']),
             "current_summary" : chunk['summary'],
             "current_title" : chunk['title']
-        }).content
+        })
 
-        return updated_chunk_title
+        return new_chunk_title
     
     def _get_new_chunk_summary(self, proposition: str) -> str:
         PROMPT = ChatPromptTemplate.from_messages(
@@ -331,11 +322,10 @@ class AgenticChunker:
             ]
         )
 
-        runnable = PROMPT | self.llm
-
-        new_chunk_summary = runnable.invoke({
+        
+        new_chunk_summary = self.llm.answer(PROMPT, {
             "proposition": proposition
-        }).content
+        })
 
         return new_chunk_summary
         
@@ -370,12 +360,9 @@ class AgenticChunker:
             ]
         )
 
-        runnable = PROMPT | self.llm
-
-        new_chunk_title = runnable.invoke({
+        new_chunk_title = self.llm.answer(PROMPT, {
             "summary": summary
-        }).content
-
+        })
         return new_chunk_title
     
     def _create_chunk(self, proposition: str) -> str:
@@ -443,13 +430,11 @@ class AgenticChunker:
                 ("user", "Tentukan apakah proposisi berikut harus masuk ke salah satu chunk yang diuraikan:\n{proposition}"),
             ]
         )
-
-        runnable = PROMPT | self.llm
-
-        chunk_found = runnable.invoke({
+        
+        chunk_found = self.llm.answer(PROMPT, {
             "proposition": proposition,
             "current_chunk_outline": chunks
-        }).content
+        })
         
         Logger.log(f"Chunk found: {chunk_found}")
         

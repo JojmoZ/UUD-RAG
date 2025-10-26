@@ -19,3 +19,8 @@ unstructured
 qdrant-client
 # === Google SDK ===
 google-genai
+# Embeddings
+sentence_transformers
+hf_xet
+transformers
+torch

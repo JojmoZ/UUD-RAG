@@ -6,11 +6,13 @@ class Config:
         load_dotenv()
         self.GOOGLE_API_KEY = self.set_env("GOOGLE_API_KEY")
         self.GROQ_API_KEY = self.set_env("GROQ_API_KEY")
+        self.QDRANT_API_KEY = self.set_env("QDRANT_API_KEY",False)
+        self.QDRANT_HOST = self.set_env("QDRANT_HOST")
         
     
-    def set_env(self, key) -> str:
+    def set_env(self, key, required: bool = True) -> str:
         env = os.getenv(key)
-        if env is None:
+        if env is None and required:
             raise ValueError(f"Environment variable {key} is not set.")
         return env
     
