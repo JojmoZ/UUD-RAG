@@ -8,6 +8,7 @@ class Config:
         self.GROQ_API_KEY = self.set_env("GROQ_API_KEY")
         self.QDRANT_API_KEY = self.set_env("QDRANT_API_KEY",False)
         self.QDRANT_HOST = self.set_env("QDRANT_HOST")
+        self.HF_TOKEN = self.set_env("HF_TOKEN", False)  # Optional for public repos
         
     
     def set_env(self, key, required: bool = True) -> str:

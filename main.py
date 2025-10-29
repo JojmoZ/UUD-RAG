@@ -9,11 +9,11 @@ from generator import RAG
 
 async def main():
     config = Config()
-    loader = PDFLoader("./peraturan_pdfs")
+    loader = PDFLoader("RM-TextMining/UU-RAG", source_type="huggingface")
     gemini = Gemini("gemini-2.5-pro", config.GOOGLE_API_KEY)
     groq = Groq("meta-llama/llama-guard-4-12b",config.GROQ_API_KEY)
     chunker = AgenticChunker(groq)
-    # await loader.load_langchain()
+    await loader.load_langchain()
     
     chunker.load_chunks()
     # chunker.print_chunks()

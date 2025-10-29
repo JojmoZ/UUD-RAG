@@ -24,3 +24,5 @@ sentence_transformers
 hf_xet
 transformers
 torch
+charset-normalizer
+chardet
