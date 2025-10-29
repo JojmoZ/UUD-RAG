@@ -4,6 +4,9 @@ import os
 import re
 import tempfile
 import requests
+import time
+import shutil
+import asyncio
 from huggingface_hub import list_repo_files, hf_hub_download
 from logger import Logger
 
@@ -56,26 +59,36 @@ class PDFLoader:
             Logger.log(f"[LOG] Found {len(pdf_files)} PDF files in repository")
             
             for pdf_file in pdf_files:
+                temp_path = None
                 try:
+                    downloaded_path = hf_hub_download(
+                        repo_id=self.source,
+                        filename=pdf_file,
+                        token=self.hf_token,
+                        repo_type=repo_type_to_try 
+                    )
+                    
                     with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_file:
                         temp_path = temp_file.name
-                        
-                        downloaded_path = hf_hub_download(
-                            repo_id=self.source,
-                            filename=pdf_file,
-                            token=self.hf_token,
-                            repo_type=repo_type_to_try 
-                        )
-                        
-                        import shutil
-                        shutil.copy2(downloaded_path, temp_path)
-                        
-                        await self._load_single_pdf(temp_path, pdf_file)
-                        
-                        os.unlink(temp_path)
-                        
+                    
+                    shutil.copy2(downloaded_path, temp_path)
+                    
+                    await self._load_single_pdf(temp_path, pdf_file)
+                    
+                    await asyncio.sleep(0.01)
+                    
                 except Exception as e:
                     Logger.log(f"Failed to download or process {pdf_file}: {e}")
+                finally:
+                    if temp_path and os.path.exists(temp_path):
+                        try:
+                            os.unlink(temp_path)
+                        except PermissionError:
+                            await asyncio.sleep(0.1)
+                            try:
+                                os.unlink(temp_path)
+                            except Exception as cleanup_error:
+                                Logger.log(f"Warning: Could not clean up temp file {temp_path}: {cleanup_error}")
                     
         except Exception as e:
             Logger.log(f"CRITICAL: Failed to access Hugging Face repository: {e}")
@@ -88,17 +101,20 @@ class PDFLoader:
         """Load a single PDF file"""
         try:
             loader = PyPDFLoader(file_path)
+            pages_loaded = []
             async for page in loader.alazy_load():
                 page.page_content = self._clean_text(page.page_content)
-                self.pages.append(page)
+                pages_loaded.append(page)
+            self.pages.extend(pages_loaded)
+            
         except PdfStreamError:
             Logger.log(f"Corrupt PDF detected, retrying with PyMuPDF: {file_name}")
             try:
                 loader = PyMuPDFLoader(file_path)
                 docs = loader.load()
-                if docs:
-                    docs[0].page_content = self._clean_text(docs[0].page_content)
-                    self.pages.append(docs[0])
+                for doc in docs:
+                    doc.page_content = self._clean_text(doc.page_content)
+                    self.pages.append(doc)
             except Exception as e:
                 Logger.log(f"Failed to load {file_name} with PyMuPDF: {e}")
         except Exception as e:
