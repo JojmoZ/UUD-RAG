@@ -2,12 +2,10 @@ from qdrant_client import QdrantClient
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from logger import Logger
 from qdrant_client.models import VectorParams, Distance, PointStruct
-from sentence_transformers import SentenceTransformer
-from qdrant_client.http.exceptions import UnexpectedResponse
-
+from embedder import BaseEmbedder
 
 class Qdrant:
-    def __init__(self,google_api_key: str, qdrant_url : str = "http://localhost:6333", qdrant_api_key: str = None, collection_name: str = "documents"):
+    def __init__(self,embedder : BaseEmbedder,google_api_key: str, qdrant_url : str = "http://localhost:6333", qdrant_api_key: str = None, collection_name: str = "documents"):
         Logger.log("qdrant url" + qdrant_url)
         self.client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
         self.collection_name = collection_name
@@ -18,25 +16,20 @@ class Qdrant:
         # model_name = "indobenchmark/indolegalbert-base"
         # tokenizer = AutoTokenizer.from_pretrained(model_name)
         # model = AutoModel.from_pretrained(model_name)
-        self.embeddings = SentenceTransformer("LazarusNLP/all-indo-e5-small-v4")
+        self.embedder = embedder
         self._create_collection_if_not_exists()
         
     def _create_collection_if_not_exists(self):
-        try:
-            self.client.get_collection(self.collection_name)
+        if not self.client.collection_exists(collection_name=self.collection_name):
+            self.client.create_collection(
+                collection_name=self.collection_name,
+                vectors_config=VectorParams(
+                        size=self.embedder.get_sentence_embedding_dimension(),
+                        distance=Distance.COSINE
+                    )
+            )
+            Logger.log(f"Collection created: {self.collection_name}")
             return
-
-        except UnexpectedResponse:
-            try:
-                self.client.create_collection(
-                    collection_name=self.collection_name,
-                    vectors_config=VectorParams(size=self.embeddings.get_sentence_embedding_dimension(), distance=Distance.COSINE)
-                )
-            except Exception as e:
-                Logger.log(f"Error creating collection: {e}")
-
-        except Exception as e:
-            Logger.log(f"Error checking collection: {e}")
         
     def add_documents(self, documents):
         try:
@@ -70,7 +63,7 @@ class Qdrant:
         
     def search(self, query: str, limit: int = 5):
         try:
-            query_vector = self.embeddings.encode(query)
+            query_vector = self.embedder.encode(query)
             search_result = self.client.search(
                 collection_name=self.collection_name,
                 query_vector=query_vector,
@@ -82,30 +75,7 @@ class Qdrant:
             return []
         
     def store_chunks(self, chunks):
-        points = []
-        for chunk_id, data in chunks.items():
-            content = "\n".join(data['propositions'])
-            full_text =  f"Judul: {data['title']}\nRingkasan: {data['summary']}\n\nKonten:\n{content}"
-            
-            try:
-                vector = self.embeddings.encode(full_text)
-                payload={
-                        "chunk_id": chunk_id,
-                        "title": data['title'],
-                        "summary": data['summary'],
-                        "propositions": data['propositions'],
-                        "full_text": content,
-                        "index": data['index']
-                    }
-                point = PointStruct(
-                    id=chunk_id,
-                    vector=vector,
-                    payload=payload
-                )
-                points.append(point)
-            except Exception as e:
-                Logger.log(f"Error embedding chunk {chunk_id}: {e}")
-                
+        points = self.embedder.generate_points_from_chunks(chunks)
         self.add_documents(points)
             
         

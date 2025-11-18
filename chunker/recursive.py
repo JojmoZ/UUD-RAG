@@ -1,6 +1,7 @@
 from langchain_core.documents import Document
 from langchain_text_splitters  import RecursiveCharacterTextSplitter
 from .base import BaseChunker
+import uuid
 
 class RecursiveChunker(BaseChunker):
     def __init__(self, max_chunk_size: int = 1000, chunk_overlap: int = 50):
@@ -12,6 +13,8 @@ class RecursiveChunker(BaseChunker):
         
 
     def load_data_to_chunks(self, pages: list[Document], use_cache: bool = True):
-        self.chunks = self.text_splitter.split_documents(pages)
-        print(f"Generated {len(self.chunks)} chunks")
-        print(self.chunks)
+        chunks = self.text_splitter.split_documents(pages)
+        for chunk in chunks:
+            id = str(uuid.uuid4())
+            self.chunks[id] = chunk
+        

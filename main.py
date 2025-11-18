@@ -6,6 +6,7 @@ from llm import Gemini, Groq
 from database import Qdrant
 from generator import RAG
 from loader import LocalPDFLoader, HuggingFacePDFLoader
+from embedder import RecursiveEmbedder
 
 async def main():
     config = Config()
@@ -14,11 +15,12 @@ async def main():
     groq = Groq("meta-llama/llama-guard-4-12b",config.GROQ_API_KEY)
     agentic_chunker = AgenticChunker(groq)
     recursive_chunker = RecursiveChunker()
-    recursive_db = Qdrant(config.GOOGLE_API_KEY,config.QDRANT_HOST, config.QDRANT_API_KEY, "recursive_chunks")
+    recursive_embedder = RecursiveEmbedder()
+    recursive_db = Qdrant(recursive_embedder,config.GOOGLE_API_KEY,config.QDRANT_HOST, config.QDRANT_API_KEY, "recursive_chunks")
     await loader.load_data()
 
     recursive_chunker.load_data_to_chunks(loader.pages)
-    # recursive_db.store_chunks(recursive_chunker.chunks)
+    recursive_db.store_chunks(recursive_chunker.chunks)
     
     # chunker.load_chunks()
     # chunker.print_chunks()
