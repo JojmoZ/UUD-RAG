@@ -3,6 +3,7 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from logger import Logger
 from qdrant_client.models import VectorParams, Distance, PointStruct
 from sentence_transformers import SentenceTransformer
+from qdrant_client.http.exceptions import UnexpectedResponse
 
 
 class Qdrant:
@@ -17,17 +18,25 @@ class Qdrant:
         # model_name = "indobenchmark/indolegalbert-base"
         # tokenizer = AutoTokenizer.from_pretrained(model_name)
         # model = AutoModel.from_pretrained(model_name)
-        self.embeddings = SentenceTransformer("all-MiniLM-L6-v2")
+        self.embeddings = SentenceTransformer("LazarusNLP/all-indo-e5-small-v4")
         self._create_collection_if_not_exists()
         
     def _create_collection_if_not_exists(self):
         try:
-            self.client.create_collection(
-                collection_name=self.collection_name,
-                vectors_config=VectorParams(size=384, distance=Distance.COSINE)
-            )
+            self.client.get_collection(self.collection_name)
+            return
+
+        except UnexpectedResponse:
+            try:
+                self.client.create_collection(
+                    collection_name=self.collection_name,
+                    vectors_config=VectorParams(size=self.embeddings.get_sentence_embedding_dimension(), distance=Distance.COSINE)
+                )
+            except Exception as e:
+                Logger.log(f"Error creating collection: {e}")
+
         except Exception as e:
-            Logger.log(f"Error creating collection: {e}")
+            Logger.log(f"Error checking collection: {e}")
         
     def add_documents(self, documents):
         try:

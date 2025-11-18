@@ -1,51 +1,25 @@
 from langchain_community.document_loaders import PyPDFLoader, PyMuPDFLoader
 from pypdf.errors import PdfStreamError
 import os
-import re
 import tempfile
-import requests
-import time
 import shutil
 import asyncio
 from huggingface_hub import list_repo_files, hf_hub_download
 from logger import Logger
+from .base import BaseLoader
 
 
-class PDFLoader:
-    def __init__(self, source: str, source_type: str = "local", hf_token: str = None):
+class HuggingFacePDFLoader(BaseLoader):
+    def __init__(self, source: str, hf_token: str = None):
         """
-        Initialize PDFLoader
-        
         Args:
-            source: Either folder path (for local) or Hugging Face repo ID (for huggingface)
-            source_type: "local" or "huggingface"
+            source: Hugging Face repo ID (for huggingface)
             hf_token: Hugging Face token for private repositories (required for private repos)
         """
-        self.source = source
-        self.source_type = source_type
+        super().__init__(source)
         self.hf_token = hf_token
-        self.pages = []
-        
-    async def load_langchain(self):
-        if self.source_type == "local":
-            await self._load_from_local()
-        elif self.source_type == "huggingface":
-            await self._load_from_huggingface()
-        else:
-            raise ValueError(f"Unsupported source_type: {self.source_type}")
     
-    async def _load_from_local(self):
-        """Load PDFs from local folder"""
-        Logger.log(f"[LOG] Loading PDFs from local folder: {self.source}")
-
-        for file_name in os.listdir(self.source):
-            file_path = os.path.join(self.source, file_name)
-            if not file_name.lower().endswith(".pdf"):
-                continue
-
-            await self._load_single_pdf(file_path, file_name)
-    
-    async def _load_from_huggingface(self):
+    async def load_data(self):
         """Load PDFs from Hugging Face repository"""
         Logger.log(f"[LOG] Loading PDFs from Hugging Face repo: {self.source}")
         
@@ -97,37 +71,7 @@ class PDFLoader:
             if self.hf_token is None and "private" in str(e).lower():
                  Logger.log("Repository might be private. Please provide a Hugging Face token.")
             raise
-    async def _load_single_pdf(self, file_path: str, file_name: str):
-        """Load a single PDF file"""
-        try:
-            loader = PyPDFLoader(file_path)
-            pages_loaded = []
-            async for page in loader.alazy_load():
-                page.page_content = self._clean_text(page.page_content)
-                pages_loaded.append(page)
-            self.pages.extend(pages_loaded)
-            
-        except PdfStreamError:
-            Logger.log(f"Corrupt PDF detected, retrying with PyMuPDF: {file_name}")
-            try:
-                loader = PyMuPDFLoader(file_path)
-                docs = loader.load()
-                for doc in docs:
-                    doc.page_content = self._clean_text(doc.page_content)
-                    self.pages.append(doc)
-            except Exception as e:
-                Logger.log(f"Failed to load {file_name} with PyMuPDF: {e}")
-        except Exception as e:
-            Logger.log(f"Unexpected error on {file_name}: {e}")
         
-    def _clean_text(self,text: str) -> str:
-        text = re.sub(r'PRESIDEN\s+REPUBLIK\s+INDONESIA', '', text, flags=re.IGNORECASE)
-        text = re.sub(r'SK\s+No\s+\d+\s*[A-Z]*', '', text)
-        
-        # Hapus nomor halaman
-        text = re.sub(r'-\s*\d+\s*-', '', text)
-        # Bersihkan karakter aneh
-        text = re.sub(r"[^\w\s.,;:()'\-]", '', text)
-        return text
+    
         
     

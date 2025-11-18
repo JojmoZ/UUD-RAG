@@ -1,21 +1,16 @@
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_groq import ChatGroq
 from logger import Logger
 import uuid
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel
 from typing import Optional
 from langchain_core.documents import Document
-from pydantic import BaseModel, ValidationError
-from typing import TypeVar, Type, Optional
-import json
+from pydantic import BaseModel
+from typing import Optional
 import os
-import hashlib
 from llm.base import BaseLLM
+from .base import BaseChunker
 
-T = TypeVar("T", bound=BaseModel)
-
-class AgenticChunker:
+class AgenticChunker(BaseChunker):
     def __init__(self, llm: BaseLLM, cache_dir: str = "./chunk_cache"):
         
         self.llm = llm
@@ -23,43 +18,7 @@ class AgenticChunker:
         self.chunks = {}
         self.cache_dir = cache_dir
         os.makedirs(cache_dir, exist_ok=True)
-        
-    def _get_document_hash(self, text: str) -> str:
-        """Generate a hash for a document to use as cache key"""
-        return hashlib.sha256(text.encode()).hexdigest()
     
-    def _get_cache_path(self, doc_hash: str) -> str:
-        """Get the cache file path for a document hash"""
-        return os.path.join(self.cache_dir, f"{doc_hash}.json")
-    
-    
-    def save_chunks(self, filepath: str = None):
-        """Save all chunks to a JSON file"""
-        if filepath is None:
-            filepath = os.path.join(self.cache_dir, "all_chunks.json")
-        
-        with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(self.chunks, f, indent=2, ensure_ascii=False)
-        
-        Logger.log(f"Saved {len(self.chunks)} chunks to {filepath}")
-    
-    def load_chunks(self, filepath: str = None) -> bool:
-        """Load chunks from a JSON file"""
-        if filepath is None:
-            filepath = os.path.join(self.cache_dir, "all_chunks.json")
-        
-        if not os.path.exists(filepath):
-            Logger.log(f"No cache file found at {filepath}")
-            return False
-        
-        try:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                self.chunks = json.load(f)
-            Logger.log(f"Loaded {len(self.chunks)} chunks from {filepath}")
-            return True
-        except Exception as e:
-            Logger.log(f"Error loading chunks: {e}")
-            return False
     
     def load_data_to_chunks(self, pages: list[Document], use_cache: bool = True):
         """
@@ -71,71 +30,12 @@ class AgenticChunker:
             use_cache: If True, will check cache before processing
         """
         for idx, page in enumerate(pages):
-            doc_hash = self._get_document_hash(page.page_content)
-            cache_path = self._get_cache_path(doc_hash)
-            
-            if use_cache and os.path.exists(cache_path):
-                Logger.log(f"[Page {idx+1}/{len(pages)}] Loading cached chunks for document hash: {doc_hash[:8]}...")
-                try:
-                    with open(cache_path, 'r', encoding='utf-8') as f:
-                        cached_chunks = json.load(f)
-                    
-                    for chunk_id, chunk_data in cached_chunks.items():
-                        if chunk_id not in self.chunks:
-                            self.chunks[chunk_id] = chunk_data
-                    
-                    Logger.log(f"Loaded {len(cached_chunks)} cached chunks")
-                    
-                    self.save_chunks()
-                    continue
-                except Exception as e:
-                    Logger.log(f"Error loading cache, will reprocess: {e}")
-            
-            Logger.log(f"[Page {idx+1}/{len(pages)}] Processing new document (hash: {doc_hash[:8]}...)")
-            chunks_before = len(self.chunks)
             self._generate_propositions(page.page_content)
-            chunks_after = len(self.chunks)
-            
-            new_chunks = {k: v for k, v in list(self.chunks.items())[chunks_before:chunks_after]}
-            
-            try:
-                with open(cache_path, 'w', encoding='utf-8') as f:
-                    json.dump(new_chunks, f, indent=2, ensure_ascii=False)
-                Logger.log(f"Cached {len(new_chunks)} chunks for this document")
-                
-                # SAVE ALL CHUNKS after every page
-                self.save_chunks()
-                Logger.log(f"Saved all {len(self.chunks)} chunks to disk")
-                
-            except Exception as e:
-                Logger.log(f"Error saving cache: {e}")
+
         
         Logger.log(f"Generated propositions for {len(pages)} pages. Total chunks: {len(self.chunks)}")
     
-    def clear_cache(self):
-        """Clear all cached chunk files"""
-        import shutil
-        if os.path.exists(self.cache_dir):
-            shutil.rmtree(self.cache_dir)
-            os.makedirs(self.cache_dir, exist_ok=True)
-            Logger.log("Cache cleared")
     
-    def parse_json_response(self, result: str, model: type[T]) -> Optional[T]:
-        """Clean up a JSON-like string returned from an LLM and parse it into a Pydantic model."""
-        cleaned = result.strip()
-
-        if cleaned.startswith("```"):
-            cleaned = cleaned.strip("`")
-            cleaned = cleaned.replace("json", "", 1).strip()
-
-        try:
-            return model.model_validate_json(cleaned)
-        except ValidationError as e:
-            print("[ERROR] JSON validation failed:", e)
-            return None
-        except Exception as e:
-            print("[ERROR] Failed to parse JSON:", e)
-            return None
         
     def _generate_propositions(self, text: str) -> list[str]:
         PROMPT = ChatPromptTemplate.from_messages(

@@ -10,7 +10,8 @@ langchain-community
 langchain-qdrant
 langchainhub
 langchain-google-genai
-langchain-groq 
+langchain-groq
+langchain-text-splitters
 # === Data Loading and Processing ===
 pypdf
 pymupdf
