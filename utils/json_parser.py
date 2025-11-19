@@ -4,7 +4,7 @@ from pydantic import BaseModel, ValidationError
 
 T = TypeVar("T", bound=BaseModel)
 
-def parse_json_response(self, result: str, model: type[T]) -> Optional[T]:
+def parse_json_response(result: str, model: type[T]) -> Optional[T]:
     """Clean up a JSON-like string returned from an LLM and parse it into a Pydantic model."""
     cleaned = result.strip()
 

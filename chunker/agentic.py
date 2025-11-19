@@ -21,23 +21,16 @@ class AgenticChunker(BaseChunker):
     
     
     def load_data_to_chunks(self, pages: list[Document], use_cache: bool = True):
-        """
-        Load documents and chunk them. Uses cache if available.
-        Saves after EVERY page is processed.
-        
-        Args:
-            pages: List of Document objects to chunk
-            use_cache: If True, will check cache before processing
-        """
-        for idx, page in enumerate(pages):
-            self._generate_propositions(page.page_content)
+        for page in enumerate(pages):
+            self._generate_propositions(page)
 
         
         Logger.log(f"Generated propositions for {len(pages)} pages. Total chunks: {len(self.chunks)}")
     
     
         
-    def _generate_propositions(self, text: str) -> list[str]:
+    def _generate_propositions(self, page: Document) -> list[str]:
+        text = page.page_content
         PROMPT = ChatPromptTemplate.from_messages(
             [
                 (
@@ -106,7 +99,7 @@ class AgenticChunker(BaseChunker):
             return []
         
         for proposition in sentences.propositions:
-            self.add_proposition(proposition)
+            self.add_proposition(proposition,page)
             
         return sentences.propositions
     
@@ -265,7 +258,7 @@ class AgenticChunker(BaseChunker):
         })
         return new_chunk_title
     
-    def _create_chunk(self, proposition: str) -> str:
+    def _create_chunk(self, proposition: str, page: Document) -> str:
         id = str(uuid.uuid4())
         summary = self._get_new_chunk_summary(proposition)
         title = self._get_new_chunk_title(summary)
@@ -275,7 +268,8 @@ class AgenticChunker(BaseChunker):
             "title": title,
             "summary": summary,
             "propositions": [proposition],
-            "index" : len(self.chunks)
+            "index" : len(self.chunks),
+            "metadata" : page.metadata
         }
         
         Logger.log(f"Created new chunk with ID: {id}, Title: {title}, Summary: {summary}")
@@ -353,17 +347,17 @@ class AgenticChunker(BaseChunker):
         self.chunks[chunk_id]['title'] = self._update_chunk_title(self.chunks[chunk_id])
         self.chunks[chunk_id]['summary'] = self._update_chunk_summary(self.chunks[chunk_id])
         
-    def add_proposition(self, proposition: str):
+    def add_proposition(self, proposition: str, page: Document):
         Logger.log(f"Adding proposition to chunker: {proposition}")
         
         if len(self.chunks) == 0:
-            self._create_chunk(proposition)
+            self._create_chunk(proposition, page)
             return
         
         # Find the most similar chunk
         most_similar_chunk_id = self._find_similar_chunk(proposition)
         if most_similar_chunk_id is None:
-            self._create_chunk(proposition)
+            self._create_chunk(proposition, page)
             return
         
         self.add_proposition_to_chunk(most_similar_chunk_id, proposition)

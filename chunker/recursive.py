@@ -16,5 +16,15 @@ class RecursiveChunker(BaseChunker):
         chunks = self.text_splitter.split_documents(pages)
         for chunk in chunks:
             id = str(uuid.uuid4())
-            self.chunks[id] = chunk
+            metadata = chunk.metadata if chunk.metadata else {}
+
+            payload = {
+                "chunk_id": id,
+                "full_text": chunk.page_content,
+                "source": metadata.get("source"),
+                "page": metadata.get("page"),
+                "total_pages": metadata.get("total_pages"),
+                "page_label": metadata.get("page_label")
+            }
         
+            self.chunks[id] = payload
