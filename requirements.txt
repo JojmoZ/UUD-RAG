@@ -18,6 +18,8 @@ pymupdf
 unstructured
 # === Vector Database ===
 qdrant-client
+faiss-cpu
+numpy
 # === Google SDK ===
 google-genai
 # Embeddings
