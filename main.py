@@ -1,10 +1,10 @@
-from chunker import AgenticChunker, RecursiveChunker
+from chunker import AgenticChunker, RecursiveChunker, SemanticChunker
 from config import Config
 import asyncio
 from logger import Logger
 from llm import Gemini, Groq
 from database import Qdrant, FAISS
-from generator import RecursiveGenerator, FAISSGenerator
+from generator import RecursiveGenerator, FAISSGenerator, SemanticGenerator, AgenticGenerator
 from loader import LocalPDFLoader, HuggingFacePDFLoader
 from fastembed import TextEmbedding, LateInteractionTextEmbedding, SparseTextEmbedding
 
@@ -39,9 +39,9 @@ async def main():
     if store_data:
         chunker_choice = get_user_choice(
             "Which chunker do you want to use?",
-            ["Recursive Chunker", "Agentic Chunker"]
+            ["Recursive Chunker (Simple, fast)", "Agentic Chunker (AI-powered, detailed)", "Semantic Chunker (Meaning-based boundaries)"]
         )
-        chunker_type = "recursive" if chunker_choice == 0 else "agentic"
+        chunker_type = ["recursive", "agentic", "semantic"][chunker_choice]
     db_choice = get_user_choice(
         "Which vector database do you want to use?",
         ["FAISS", "Qdrant"]
@@ -55,16 +55,21 @@ async def main():
     
     recursive_chunker = RecursiveChunker()
     agentic_chunker = AgenticChunker(groq)
+    semantic_chunker = SemanticChunker(embedding_model_name="LazarusNLP/all-indo-e5-small-v4")
     
     if store_data:
         if chunker_type == "recursive":
             selected_chunker = recursive_chunker
             collection_name = "recursive_chunks"
             Logger.log("Using Recursive Chunker")
-        else:
-            selected_chunker = agentic_chunker  
+        elif chunker_type == "agentic":
+            selected_chunker = agentic_chunker
             collection_name = "agentic_chunks"
             Logger.log("Using Agentic Chunker")
+        else:  # semantic
+            selected_chunker = semantic_chunker
+            collection_name = "semantic_chunks"
+            Logger.log("Using Semantic Chunker")
     else:
         selected_chunker = recursive_chunker
         collection_name = "recursive_chunks"
@@ -80,7 +85,12 @@ async def main():
     else:
         Logger.log("Using Qdrant database")
         db = Qdrant(config.QDRANT_HOST, config.QDRANT_API_KEY, collection_name)
-        rag_generator = RecursiveGenerator(db, gemini)
+        if chunker_type == "semantic" and store_data:
+            rag_generator = SemanticGenerator(db, gemini)
+        elif chunker_type == "agentic" and store_data:
+            rag_generator = AgenticGenerator(db, gemini)
+        else:
+            rag_generator = RecursiveGenerator(db, gemini)
 
     if store_data:
         Logger.log("Loading and processing documents...")

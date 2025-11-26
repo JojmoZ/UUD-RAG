@@ -1,9 +1,9 @@
 # === LangChain Core Components ===
 langchain-core
 langchain
+langchain-experimental
 
-llama-index 
-langchain_experimental
+llama-index
 # === LangChain Integrations ===
 langchain-google-genai
 langchain-community
