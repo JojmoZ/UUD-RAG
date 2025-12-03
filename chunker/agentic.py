@@ -11,7 +11,7 @@ from llm.base import BaseLLM
 from .base import BaseChunker
 from typing import Dict
 from model import AgenticChunk
-
+from utils import json_parser as utils
 class AgenticChunker(BaseChunker):
     def __init__(self, llm: BaseLLM, cache_dir: str = "./chunk_cache"):
         super().__init__()
@@ -88,8 +88,7 @@ class AgenticChunker(BaseChunker):
         
         class Sentences (BaseModel):
             propositions: list[str]
-            
-        sentences = self.parse_json_response(result, Sentences)
+        sentences = utils.parse_json_response(result, Sentences)
         
         if sentences is None:
             Logger.log("No propositions generated.")

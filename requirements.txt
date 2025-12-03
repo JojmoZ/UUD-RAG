@@ -1,9 +1,9 @@
 # === LangChain Core Components ===
 langchain-core
 langchain
+langchain-experimental
 
-llama-index 
-langchain_experimental
+llama-index
 # === LangChain Integrations ===
 langchain-google-genai
 langchain-community
@@ -18,6 +18,8 @@ pymupdf
 unstructured
 # === Vector Database ===
 qdrant-client
+faiss-cpu
+numpy
 # === Google SDK ===
 google-genai
 # Embeddings
@@ -29,3 +31,6 @@ charset-normalizer
 chardet
 
 fastembed
+
+# === RAGAS ===
+ragas
