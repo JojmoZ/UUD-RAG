@@ -1,11 +1,13 @@
-from database import Qdrant
+from database.base import VectorStore
 from langchain_core.prompts import ChatPromptTemplate
 from llm import BaseLLM
+from rag.search_strategy import SearchStrategy
 
 class BaseGenerator:
-    def __init__(self, database : Qdrant,llm: BaseLLM):
+    def __init__(self, database: VectorStore, llm: BaseLLM, search_strategy: SearchStrategy):
         self.database = database
         self.llm = llm
+        self.search_strategy = search_strategy
     
     def generate_prompt(self, context: str, question: str):
         prompt = ChatPromptTemplate.from_messages([

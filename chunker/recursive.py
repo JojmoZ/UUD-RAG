@@ -2,7 +2,7 @@ from langchain_core.documents import Document
 from langchain_text_splitters  import RecursiveCharacterTextSplitter
 from .base import BaseChunker
 import uuid
-from model.recursive_chunk import RecursiveChunk
+from model.chunk.recursive_chunk import RecursiveChunk
 from typing import Dict
 
 class RecursiveChunker(BaseChunker):

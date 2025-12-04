@@ -4,17 +4,11 @@ import pickle
 import os
 from sentence_transformers import SentenceTransformer
 from logger import Logger
-from model import BaseChunk
+from model import BaseChunk, SearchResult, Point
 from typing import Dict, List, Tuple, Optional
+from database.base import VectorStore, DenseSearchable
 
-class ScoredPoint:
-    """Custom scored point class to match Qdrant's interface"""
-    def __init__(self, id: str, payload: dict, score: float):
-        self.id = id
-        self.payload = payload
-        self.score = score
-
-class FAISS:
+class FAISS(VectorStore, DenseSearchable):
     def __init__(self, 
                  index_path: str = "./faiss_index", 
                  dense_model_name: str = "LazarusNLP/all-indo-e5-small-v4",
@@ -95,22 +89,12 @@ class FAISS:
             Logger.log(f"Error saving index: {e}")
             raise
     
-    def add_documents(self, points):
-        """Add documents to FAISS index (maintaining compatibility with Qdrant interface)"""
+    def add_documents(self, points: list[Point]):
+        """Add documents to FAISS index"""
         try:
             vectors = []
             for point in points:
-                if hasattr(point, 'vector') and isinstance(point.vector, dict):
-                    dense_vector = point.vector.get('dense')
-                elif hasattr(point, 'vector'):
-                    dense_vector = point.vector
-                else:
-                    raise ValueError(f"Invalid point structure: {point}")
-                
-                if dense_vector is None:
-                    raise ValueError("Dense vector not found in point")
-                
-                vectors.append(dense_vector)
+                vectors.append(point.vector)
                 
                 point_id = str(point.id)
                 current_index = len(self.id_to_index)
@@ -130,7 +114,7 @@ class FAISS:
             Logger.log(f"Error adding documents to FAISS: {e}")
             raise
     
-    def dense_search(self, query: str, limit: int = 5) -> List[ScoredPoint]:
+    def dense_search(self, query: str, limit: int = 5) -> List[SearchResult]:
         """Search using dense embeddings only"""
         try:
             if self.index.ntotal == 0:
@@ -148,7 +132,7 @@ class FAISS:
                 if idx != -1:
                     point_id = self.index_to_id[idx]
                     payload = self.id_to_payload[point_id]
-                    results.append(ScoredPoint(id=point_id, payload=payload, score=float(score)))
+                    results.append(SearchResult(id=point_id, payload=payload, score=float(score)))
             
             Logger.log(f"FAISS dense search found {len(results)} results for query: '{query}'")
             return results
@@ -157,30 +141,18 @@ class FAISS:
             Logger.log(f"Error in FAISS dense search: {e}")
             return []
     
-    def search(self, query: str, limit: int = 5) -> List[ScoredPoint]:
-        """Default search method (uses dense search for FAISS)"""
-        return self.dense_search(query, limit)
-    
     def store_chunks(self, chunks: Dict[str, BaseChunk]):
         """Store chunks in FAISS database"""
         try:
+            # Batch encode all texts at once (efficient)
             texts = [chunk.get_context() for chunk in chunks.values()]
             embeddings = self.dense_model.encode(texts)
             
-            points = []
-            for i, (chunk_id, chunk) in enumerate(chunks.items()):
-                class Point:
-                    def __init__(self, id, vector, payload):
-                        self.id = id
-                        self.vector = vector
-                        self.payload = payload
-                
-                point = Point(
-                    id=chunk_id,
-                    vector=embeddings[i],
-                    payload=chunk.get_payload()
-                )
-                points.append(point)
+            # Create point objects with pre-computed embeddings
+            points = [
+                Point(id=chunk_id, vector=embeddings[i], payload=chunk.get_payload())
+                for i, (chunk_id, chunk) in enumerate(chunks.items())
+            ]
             
             self.add_documents(points)
             Logger.log(f"Stored {len(chunks)} chunks in FAISS database")
@@ -210,21 +182,6 @@ class FAISS:
         except Exception as e:
             Logger.log(f"Error deleting FAISS collection: {e}")
             raise
-    
-    def get_info(self):
-        """Get information about the FAISS database"""
-        try:
-            return {
-                "name": self.collection_name,
-                "vectors_count": self.index.ntotal if self.index else 0,
-                "points_count": self.index.ntotal if self.index else 0,
-                "status": "ready" if self.index else "not_initialized",
-                "embedding_dimension": self.embedding_dim,
-                "model_name": self.dense_model_name
-            }
-        except Exception as e:
-            Logger.log(f"Error getting FAISS info: {e}")
-            return {}
     
     def close(self):
         """Clean up resources"""

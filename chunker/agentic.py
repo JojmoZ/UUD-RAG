@@ -10,7 +10,7 @@ import os
 from llm.base import BaseLLM
 from .base import BaseChunker
 from typing import Dict
-from model import AgenticChunk
+from model.chunk.agentic_chunk import AgenticChunk
 from utils import json_parser as utils
 class AgenticChunker(BaseChunker):
     def __init__(self, llm: BaseLLM, cache_dir: str = "./chunk_cache"):

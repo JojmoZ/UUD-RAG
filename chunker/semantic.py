@@ -3,7 +3,7 @@ from langchain_experimental.text_splitter import SemanticChunker as LangChainSem
 from sentence_transformers import SentenceTransformer
 from .base import BaseChunker
 import uuid
-from model.semantic_chunk import SemanticChunk
+from model.chunk.semantic_chunk import SemanticChunk
 from typing import Dict
 from logger import Logger
 

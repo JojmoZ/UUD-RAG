@@ -4,7 +4,9 @@ import asyncio
 from logger import Logger
 from llm import Gemini, Groq
 from database import Qdrant, FAISS
-from generator import RecursiveGenerator, FAISSGenerator, SemanticGenerator, AgenticGenerator
+from generator import RecursiveGenerator, SemanticGenerator, AgenticGenerator
+from rag.search_strategy import DenseSearchStrategy, HybridColbertSearchStrategy
+from rag.pipeline import RAGPipeline
 from loader import LocalPDFLoader, HuggingFacePDFLoader
 from fastembed import TextEmbedding, LateInteractionTextEmbedding, SparseTextEmbedding
 
@@ -72,35 +74,45 @@ async def main():
     else:
         return
     
+    # Setup database
     if use_faiss:
-        Logger.log("Using FAISS database")
         db = FAISS(
             index_path="./faiss_index",
             dense_model_name="LazarusNLP/all-indo-e5-small-v4",
             collection_name=collection_name
         )
-        rag_generator = FAISSGenerator(db, gemini)
+        search_strategy = DenseSearchStrategy()
     else:
         db = Qdrant(config.QDRANT_HOST, config.QDRANT_API_KEY, collection_name)
-        if chunker_type == "semantic" and store_data:
-            rag_generator = SemanticGenerator(db, gemini)
-        elif chunker_type == "agentic" and store_data:
-            rag_generator = AgenticGenerator(db, gemini)
-        else:
-            rag_generator = RecursiveGenerator(db, gemini)
-
+        search_strategy = HybridColbertSearchStrategy()
+    
+    # Setup generator based on chunker type
+    if chunker_type == "semantic" and store_data:
+        generator = SemanticGenerator(db, gemini, search_strategy)
+    elif chunker_type == "agentic" and store_data:
+        generator = AgenticGenerator(db, gemini, search_strategy)
+    else:
+        generator = RecursiveGenerator(db, gemini, search_strategy)
+    
+    # Create RAG Pipeline
+    rag_pipeline = RAGPipeline(
+        database=db,
+        llm=gemini,
+        search_strategy=search_strategy,
+        generator=generator,
+        chunker=selected_chunker if store_data else None,
+        loader=loader if store_data else None
+    )
+    
+    # Ingest documents if needed
     if store_data:
-        await loader.load_data()
-        
-        Logger.log(f"Processing {len(loader.pages)} pages with {chunker_type} chunker...")
-        selected_chunker.load_data_to_chunks(loader.pages)
-        
-        Logger.log(f"Storing {len(selected_chunker.chunks)} chunks in {db.__class__.__name__} database...")
-        db.store_chunks(selected_chunker.chunks)
+        success = await rag_pipeline.ingest_documents()
+        if not success:
+            Logger.log("Failed to ingest documents")
+            return
     else:
         Logger.log("Skipping document loading - using existing chunks")
-        
-        info = db.get_info()
+        info = rag_pipeline.get_database_info()
 
     print("\n" + "="*60)
     print("RAG System Ready! Enter your questions (type 'quit' to exit)")
@@ -112,11 +124,8 @@ async def main():
             Logger.log("Exiting RAG system...")
             break
         if not query:
-            print("Please enter a valid question.")
-            continue
         try:
-            Logger.log(f"Processing query: {query}")
-            answer = rag_generator.generate_answer(query)
+            answer = rag_pipeline.query(query)
             print(f"\n Answer: {answer['answer']}")
             print(f" Sources found: {len(answer['sources'])}")
             if answer['sources']:
@@ -128,6 +137,8 @@ async def main():
                         print(f"   {i}. {source['title']} - Score: {source['score']:.3f}")
         except Exception as e:
             Logger.log(f"Error processing query: {e}")
+            print(f"❌ Error: {str(e)}")
+    rag_pipeline.close()gger.log(f"Error processing query: {e}")
             print(f"❌ Error: {str(e)}")
     db.close()
     Logger.log("Session ended successfully!")

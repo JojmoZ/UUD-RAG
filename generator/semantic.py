@@ -1,16 +1,17 @@
-from database import Qdrant
+from database.base import VectorStore
 from logger import Logger
 from llm import BaseLLM
+from rag.search_strategy import SearchStrategy
 from .base import BaseGenerator
 from qdrant_client.models import ScoredPoint
 
 class SemanticGenerator(BaseGenerator):
-    def __init__(self, database: Qdrant, llm: BaseLLM):
-        super().__init__(database, llm)
+    def __init__(self, database: VectorStore, llm: BaseLLM, search_strategy: SearchStrategy):
+        super().__init__(database, llm, search_strategy)
         
     def generate_answer(self, query: str, limit: int = 5):
         try:
-            relevant_chunks: list[ScoredPoint] = self.database.hybrid_search_with_colbert(query, limit)
+            relevant_chunks = self.search_strategy.search(self.database, query, limit)
             
             if not relevant_chunks:
                 return {
