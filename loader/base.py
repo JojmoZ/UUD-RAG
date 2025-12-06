@@ -25,6 +25,8 @@ class BaseLoader:
     async def _load_single_pdf(self, file_path: str, file_name: str):
         """Load a single PDF file"""
         try:
+            Logger.log(f"Loading: {file_name}")
+            
             with open(file_path, 'rb') as f:
                 header = f.read(8)
                 if not header.startswith(b'%PDF'):

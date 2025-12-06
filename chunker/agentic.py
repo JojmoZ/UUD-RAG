@@ -38,12 +38,13 @@ class AgenticChunker(BaseChunker):
             
             self._generate_propositions(page)
             
-            # Cache chunks for this document
+            # Track document-to-chunks mapping (will be saved later)
             self.document_chunks[doc_hash] = self.current_doc_chunk_ids
-            if use_cache:
-                self._save_chunks_to_cache(doc_hash, self.current_doc_chunk_ids)
         
         Logger.log(f"Generated propositions for {len(pages)} pages. Total chunks: {len(self.chunks)}")
+        
+        # Export all chunks to cache after processing all documents
+        self.export_all_chunks_to_cache()
     
     def _generate_propositions(self, page: Document) -> list[str]:
         text = page.page_content
@@ -400,3 +401,13 @@ class AgenticChunker(BaseChunker):
             print(f"Ringkasan Chunk: {chunk.summary}")
             print(f"Proposisi Chunk: {chunk.propositions}")
             print("")
+    
+    def _get_chunk_type(self) -> str:
+        return 'agentic'
+    
+    def _reconstruct_chunks(self, chunks_data: Dict[str, dict], chunk_type: str) -> Dict[str, AgenticChunk]:
+        """Reconstruct AgenticChunk objects from JSON data"""
+        chunks = {}
+        for chunk_id, chunk_dict in chunks_data.items():
+            chunks[chunk_id] = AgenticChunk(**chunk_dict)
+        return chunks

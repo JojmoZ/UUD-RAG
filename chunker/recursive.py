@@ -51,9 +51,20 @@ class RecursiveChunker(BaseChunker):
                 self.chunks[id] = chunk_obj
                 chunk_ids.append(id)
             
-            # Cache chunks for this document
+            # Track document-to-chunks mapping (will be saved later)
             self.document_chunks[doc_hash] = chunk_ids
-            if use_cache:
-                self._save_chunks_to_cache(doc_hash, chunk_ids)
         
         Logger.log(f"Created {len(self.chunks)} total chunks")
+        
+        # Export all chunks to cache after processing all documents
+        self.export_all_chunks_to_cache()
+    
+    def _get_chunk_type(self) -> str:
+        return 'recursive'
+    
+    def _reconstruct_chunks(self, chunks_data: Dict[str, dict], chunk_type: str) -> Dict[str, RecursiveChunk]:
+        """Reconstruct RecursiveChunk objects from JSON data"""
+        chunks = {}
+        for chunk_id, chunk_dict in chunks_data.items():
+            chunks[chunk_id] = RecursiveChunk(**chunk_dict)
+        return chunks

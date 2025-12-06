@@ -53,10 +53,11 @@ class SemanticChunker(BaseChunker):
                 Logger.log("All documents already cached")
                 return
             
-            Logger.log(f"Processing {len(pages)} uncached documents with semantic chunking...")
+            total_pages = len(pages)
+            Logger.log(f"Processing {total_pages} uncached documents with semantic chunking...")
             
             # Process each document separately to maintain per-document caching
-            for page in pages:
+            for idx, page in enumerate(pages, 1):
                 doc_hash = self._get_document_hash(page)
                 chunk_ids = []
                 
@@ -74,38 +75,24 @@ class SemanticChunker(BaseChunker):
                         page=metadata.get("page"),
                         total_pages=metadata.get("total_pages"),
                         page_label=metadata.get("page_label"),
+                        semantic_score=0.0,  # Default score
+                        boundary_type="semantic"  # Semantic boundary type
                     )
 
                     self.chunks[id] = chunk_obj
                     chunk_ids.append(id)
                 
-                # Cache chunks for this document
+                # Track document-to-chunks mapping (will be saved later)
                 self.document_chunks[doc_hash] = chunk_ids
-                if use_cache:
-                    self._save_chunks_to_cache(doc_hash, chunk_ids)
+                
+                # Show progress every 100 pages
+                if idx % 100 == 0 or idx == total_pages:
+                    Logger.log(f"Progress: {idx}/{total_pages} pages processed ({idx*100//total_pages}%)")
             
             Logger.log(f"Semantic chunker created {len(self.chunks)} total chunks")
             
-            for doc in docs:
-                chunk_id = str(uuid.uuid4())
-                metadata = doc.metadata or {}
-                semantic_score = metadata.get("semantic_similarity", 0.95)  # Default high similarity
-                boundary_type = "semantic_boundary"  # Could be enhanced with actual boundary detection
-                
-                chunk_obj = SemanticChunk(
-                    id=chunk_id,
-                    content=doc.page_content,
-                    source=metadata.get("source", "Unknown"),
-                    page=metadata.get("page", 0),
-                    total_pages=metadata.get("total_pages", 0),
-                    page_label=metadata.get("page_label", ""),
-                    semantic_score=semantic_score,
-                    boundary_type=boundary_type
-                )
-                
-                self.chunks[chunk_id] = chunk_obj
-            
-            Logger.log(f"Successfully created {len(self.chunks)} semantic chunks")
+            # Export all chunks to cache after processing all documents
+            self.export_all_chunks_to_cache()
             
         except Exception as e:
             Logger.log(f"Error in semantic chunking: {e}")
@@ -119,3 +106,13 @@ class SemanticChunker(BaseChunker):
             "breakpoint_threshold_amount": self.text_splitter.breakpoint_threshold_amount,
             "total_chunks": len(self.chunks)
         }
+    
+    def _get_chunk_type(self) -> str:
+        return 'semantic'
+    
+    def _reconstruct_chunks(self, chunks_data: Dict[str, dict], chunk_type: str) -> Dict[str, SemanticChunk]:
+        """Reconstruct SemanticChunk objects from JSON data"""
+        chunks = {}
+        for chunk_id, chunk_dict in chunks_data.items():
+            chunks[chunk_id] = SemanticChunk(**chunk_dict)
+        return chunks
