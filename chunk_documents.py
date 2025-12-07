@@ -101,14 +101,14 @@ async def main():
             print("  Choose LLM:")
             print("  1. Gemini (gemini-2.0-flash-lite)")
             print("  2. GeminiLive (gemini-2.0-flash-exp)")
-            print("  3. Ollama (qwen3:27b)")
+            print("  3. Ollama (gemma3:12b)")
             
             llm_choice = input("\n  Enter your choice (1-3): ").strip()
             
             if llm_choice == "2":
                 llm = GeminiLive("gemini-2.0-flash-exp", config.GOOGLE_API_KEY)
             elif llm_choice == "3":
-                llm = Ollama("qwen3:27b", base_url="https://b84f92e0aabb.ngrok-free.app")
+                llm = Ollama("gemma3:12b", base_url="https://0c8fd33555ef.ngrok-free.app")
             else:
                 llm = Gemini("gemini-2.0-flash-lite", config.GOOGLE_API_KEY)
             
