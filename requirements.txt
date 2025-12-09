@@ -12,6 +12,7 @@ langchainhub
 langchain-google-genai
 langchain-groq
 langchain-text-splitters
+langchain-openai
 # === Data Loading and Processing ===
 pypdf
 pymupdf

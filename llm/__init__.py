@@ -1,7 +1,7 @@
 from .base import BaseLLM
 from .gemini import Gemini
-from .gemini_live import GeminiLive
 from .groq import Groq
 from .ollama import Ollama
+from .chatgpt import ChatGPT
 
-__all__ = ["BaseLLM", "Gemini", "GeminiLive", "Groq", "Ollama"]
+__all__ = ["BaseLLM", "Gemini", "Groq", "Ollama", "ChatGPT"]

@@ -9,7 +9,7 @@ import os
 from logger import Logger
 from loader import LocalPDFLoader
 from chunker import RecursiveChunker, SemanticChunker, AgenticChunker, AgenticChunkerV2
-from llm import Gemini, GeminiLive, Ollama
+from llm import Gemini, ChatGPT, Ollama
 from config import Config
 
 
@@ -107,13 +107,13 @@ async def main():
             print("\nAgentic Chunker V1 Configuration:")
             print("  Choose LLM:")
             print("  1. Gemini (gemini-2.0-flash-lite)")
-            print("  2. GeminiLive (gemini-2.0-flash-exp)")
+            print("  2. ChatGPT (gpt-4o-mini)")
             print("  3. Ollama (gemma3:12b)")
             
             llm_choice = input("\n  Enter your choice (1-3): ").strip()
             
             if llm_choice == "2":
-                llm = GeminiLive("gemini-2.0-flash-exp", config.GOOGLE_API_KEY)
+                llm = ChatGPT("gpt-4o-mini", config.OPENAI_API_KEY)
             elif llm_choice == "3":
                 llm = Ollama("gemma3:12b", base_url="http://10.22.208.138:11434")
             else:
@@ -126,13 +126,13 @@ async def main():
             print("\nAgentic Chunker V2 Configuration:")
             print("  Choose LLM:")
             print("  1. Gemini (gemini-2.0-flash-lite)")
-            print("  2. GeminiLive (gemini-2.0-flash-exp)")
+            print("  2. ChatGPT (gpt-4o-mini)")
             print("  3. Ollama (gemma3:12b)")
             
             llm_choice = input("\n  Enter your choice (1-3): ").strip()
             
             if llm_choice == "2":
-                llm = GeminiLive("gemini-2.0-flash-exp", config.GOOGLE_API_KEY)
+                llm = ChatGPT("gpt-4o-mini", config.OPENAI_API_KEY)
             elif llm_choice == "3":
                 llm = Ollama("gemma3:12b", base_url="http://10.22.208.138:11434")
             else:
