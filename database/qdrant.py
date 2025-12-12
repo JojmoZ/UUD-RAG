@@ -97,7 +97,8 @@ class Qdrant(VectorStore, DenseSearchable, SparseSearchable, HybridSearchable, C
             Logger.log(f"Error searching documents: {e}")
             return []
         
-    def hybrid_search(self, query: str, limit: int = 5) -> list[ScoredPoint]:
+    def hybrid_search(self, query: str, limit: int = 5, multiplier: int = 3) -> list[ScoredPoint]:
+        initial_limit = limit * multiplier
         try:
             sparse_vecs = next(self.sparse_model.embed(query))
 
@@ -107,12 +108,12 @@ class Qdrant(VectorStore, DenseSearchable, SparseSearchable, HybridSearchable, C
                     Prefetch(
                         query=SparseVector(**sparse_vecs.as_object()),
                         using="sparse",
-                        limit=limit
+                        limit=initial_limit
                     ),
                     Prefetch(
                         query=self.dense_model.encode(query),
                         using="dense",
-                        limit=limit
+                        limit=initial_limit
                     )
                 ],
                 limit=limit,
@@ -123,32 +124,36 @@ class Qdrant(VectorStore, DenseSearchable, SparseSearchable, HybridSearchable, C
             Logger.log(f"Error searching documents: {e}")
             return []
         
-    def hybrid_search_with_colbert(self, query: str, limit: int = 5) -> list[ScoredPoint]:
+    def hybrid_search_with_colbert(self, query: str, limit: int = 5,initial_limit_multiplier: int = 5) -> list[ScoredPoint]:
+        initial_limit = limit * initial_limit_multiplier
+
         try:
             sparse_vecs = next(self.sparse_model.embed(query))
+            
             rrf_prefetch = Prefetch(
                 prefetch=[
                     Prefetch(
                         query=SparseVector(**sparse_vecs.as_object()),
                         using="sparse",
-                        limit=limit
+                        limit=initial_limit
                     ),
                     Prefetch(
                         query=self.dense_model.encode(query),
                         using="dense",
-                        limit=limit
+                        limit=initial_limit
                     )
                 ],
-                limit=limit,
-                query= FusionQuery(fusion=Fusion.RRF)
+                limit=initial_limit,
+                query=FusionQuery(fusion=Fusion.RRF)
             )
+
             search_result = self.client.query_points(
                 collection_name=self.collection_name,
                 prefetch=[
                     rrf_prefetch
                 ],
-                limit=limit,
-                query= next(self.late_interaction_model.embed(query)),
+                limit=limit, 
+                query=next(self.late_interaction_model.embed(query)),
                 using="late_interaction"
             )
 
@@ -156,8 +161,8 @@ class Qdrant(VectorStore, DenseSearchable, SparseSearchable, HybridSearchable, C
         except Exception as e:
             Logger.log(f"Error searching documents: {e}")
             return []
-    
-    def hybrid_search_with_crossencoder(self, query: str, limit: int = 5, initial_limit_multiplier: int = 3) -> list[ScoredPoint]:
+        
+    def hybrid_search_with_crossencoder(self, query: str, limit: int = 5, initial_limit_multiplier: int = 5) -> list[ScoredPoint]:
         """Performs hybrid search with cross-encoder reranking.
         
         Args:
