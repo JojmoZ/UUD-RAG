@@ -110,7 +110,7 @@ class QdrantChecker:
         try:
             with open(cache_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-            chunk_type = data.get('chunker_type', chunk_type_hint)
+            chunk_type = data.get('chunk_type', chunk_type_hint)
             chunks = data.get('chunks', [])
             for chunk_dict in chunks:
                 cid = str(chunk_dict.get('id'))

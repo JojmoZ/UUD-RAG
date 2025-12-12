@@ -2,3 +2,5 @@
 venv/
 faiss_index/
 __pycache__/
+
+.qdrant_progress*.json
